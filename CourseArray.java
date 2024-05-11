@@ -90,4 +90,12 @@ public class CourseArray {
 		for (int i = 1; i < elements.length; i++)
 			System.out.println(i + "\t" + elements[i].mySlot);
 	}
+	
+	public int[] getTimeSlot(int index) {
+	    int[] timeSlot = new int[this.elements.length];
+	    for (int i = 0; i < this.elements.length; i++) {
+	        timeSlot[i] = this.elements[i].mySlot == index ? 1 : -1;
+	    }
+	    return timeSlot;
+	}
 }

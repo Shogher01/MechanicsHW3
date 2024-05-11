@@ -1,165 +1,146 @@
-import java.awt.*;
-import java.awt.event.*;
 import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.logging.Logger;
+import java.util.logging.FileHandler;
+import java.util.logging.SimpleFormatter;
 
 public class TimeTable extends JFrame implements ActionListener {
+    private JPanel screen = new JPanel();
+    private JPanel tools = new JPanel();
+    private JButton[] tool;
+    private JTextField[] field;
+    private CourseArray courses;
+    private Color[] CRScolor;
+    private Autoassociator autoassociator = new Autoassociator();
+    private static Logger logger = Logger.getLogger("TimeTableLog");
+    private static final String CLASH_FILE_PATH = "lse-f-91.stu";
 
-	private JPanel screen = new JPanel(), tools = new JPanel();
-	private JButton tool[];
-	private JTextField field[];
-	private CourseArray courses;
-	private Color CRScolor[] = {Color.RED, Color.GREEN, Color.BLACK};
-	
-	public TimeTable() {
-		super("Dynamic Time Table");
-		setSize(500, 800);
-		setLayout(new FlowLayout());
-		
-		screen.setPreferredSize(new Dimension(400, 800));
-		add(screen);
+    public TimeTable() {
+        super("Dynamic Time Table");
+        this.CRScolor = new Color[]{Color.RED, Color.GREEN, Color.BLACK};
+        this.setSize(500, 800);
+        this.setLayout(new FlowLayout());
+        this.screen.setPreferredSize(new Dimension(400, 800));
+        this.add(this.screen);
+        this.setTools();
+        this.add(this.tools);
+        this.setVisible(true);
+        initializeLogger();
+    }
 
-		setTools();
-
-		add(tools);
-		continueButton= new JButton("Continue");
-		continueButton.addActionListener(new ActionListener(){
-			public void actionPerformed(ActionEvent e){
-				continueState();
-			}
-		})
-		add(continueButton);
-		setVisible(true);
-	}
-	
-
-private void continueState() {
-    boolean hasImproved = true;
-    int iterationCount = 0;
-    
-    while (hasImproved) {
-        hasImproved = false;
-        int currentClashes = courses.getRemainingClashes();
-        
-        for (int courseId = 1; courseId < courses.getCount(); courseId++) {
-            if (courses.hasClashes(courseId)) {
-                int originalSlot= courses.getSlot(courseId);
-                int maxSlots = Integer.parseInt(field[0].getText());
-                
-                for (int newSlot =0; newSlot < maxSlots; newSlot++) {
-                    if (newSlot != originalSlot) {
-                        courses.setSlot(courseId, newSlot);
-                        
-                        if (courses.getRemainingClashes() < currentClashes) {
-                            draw();
-                            currentClashes = courses.getRemainingClashes();
-                            hasImproved =true;
-                            break;
-                        } else {
-                            courses.setSlot(courseId, originalSlot);
-                        }
-                    }
-                }
-            }
-        }
-        
-        iterationCount++;
-        int maxIterations =Integer.parseInt(field[3].getText());
-        
-        if (iterationCount> maxIterations) {
-            break;
+    private void initializeLogger() {
+        try {
+            FileHandler fh = new FileHandler("TimeTableLog.log", true);
+            logger.addHandler(fh);
+            SimpleFormatter formatter = new SimpleFormatter();
+            fh.setFormatter(formatter);
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
-    
-    System.out.println("Iteration count: " + iterationCount + ", Remaining clashes: " + courses.getRemainingClashes());
-}
 
+    public void setTools() {
+        String[] capField = new String[]{"Slots:", "Courses:", "Iters:", "Shift:"};
+        this.field = new JTextField[capField.length];
+        String[] capButton = new String[]{"Load", "Start", "Step", "Continue", "Print", "Exit"};
+        this.tool = new JButton[capButton.length];
+        this.tools.setLayout(new GridLayout(2 * capField.length + capButton.length, 1));
 
-	public void setTools() {
-		String capField[] = {"Slots:", "Courses:", "Clash File:", "Iters:", "Shift:"};
-		field = new JTextField[capField.length];
-		
-		String capButton[] = {"Load", "Start", "Step", "Print", "Exit"};
-		tool = new JButton[capButton.length];
-		
-		tools.setLayout(new GridLayout(2 * capField.length + capButton.length, 1));
-		
-		for (int i = 0; i < field.length; i++) {
-			tools.add(new JLabel(capField[i]));
-			field[i] = new JTextField(5);
-			tools.add(field[i]);
-		}
-		
-		for (int i = 0; i < tool.length; i++) {
-			tool[i] = new JButton(capButton[i]);
-			tool[i].addActionListener(this);
-			tools.add(tool[i]);
-		}
-		
-		field[0].setText("17");
-		field[1].setText("381");
-		field[2].setText("ear-f-83.stu");
-		field[3].setText("1");
-	}
-	
-	public void draw() {
-		Graphics g = screen.getGraphics();
-		int width = Integer.parseInt(field[0].getText()) * 10;
-		for (int courseIndex = 1; courseIndex < courses.length(); courseIndex++) {
-			g.setColor(CRScolor[courses.status(courseIndex) > 0 ? 0 : 1]);
-			g.drawLine(0, courseIndex, width, courseIndex);
-			g.setColor(CRScolor[CRScolor.length - 1]);
-			g.drawLine(10 * courses.slot(courseIndex), courseIndex, 10 * courses.slot(courseIndex) + 10, courseIndex);
-		}
-	}
-	
-	private int getButtonIndex(JButton source) {
-		int result = 0;
-		while (source != tool[result]) result++;
-		return result;
-	}
-	
-	public void actionPerformed(ActionEvent click) {
-		int min, step, clashes;
-		
-		switch (getButtonIndex((JButton) click.getSource())) {
-		case 0:
-			int slots = Integer.parseInt(field[0].getText());
-			courses = new CourseArray(Integer.parseInt(field[1].getText()) + 1, slots);
-			courses.readClashes(field[2].getText());
-			draw();
-			break;
-		case 1:
-			min = Integer.MAX_VALUE;
-			step = 0;
-			for (int i = 1; i < courses.length(); i++) courses.setSlot(i, 0);
-			
-			for (int iteration = 1; iteration <= Integer.parseInt(field[3].getText()); iteration++) {
-				courses.iterate(Integer.parseInt(field[4].getText()));
-				draw();
-				clashes = courses.clashesLeft();
-				if (clashes < min) {
-					min = clashes;
-					step = iteration;
-				}
-			}
-			System.out.println("Shift = " + field[4].getText() + "\tMin clashes = " + min + "\tat step " + step);
-			setVisible(true);
-			break;
-		case 2:
-			courses.iterate(Integer.parseInt(field[4].getText()));
-			draw();
-			break;
-		case 3:
-			System.out.println("Exam\tSlot\tClashes");
-			for (int i = 1; i < courses.length(); i++)
-				System.out.println(i + "\t" + courses.slot(i) + "\t" + courses.status(i));
-			break;
-		case 4:
-			System.exit(0);
-		}
-	}
+        for (int i = 0; i < this.field.length; i++) {
+            this.tools.add(new JLabel(capField[i]));
+            this.field[i] = new JTextField(5);
+            this.tools.add(this.field[i]);
+        }
 
-	public static void main(String[] args) {
-		new TimeTable();
-	}
+        for (int i = 0; i < this.tool.length; i++) {
+            this.tool[i] = new JButton(capButton[i]);
+            this.tool[i].addActionListener(this);
+            this.tools.add(this.tool[i]);
+        }
+    }
+
+    public void actionPerformed(ActionEvent click) {
+        JButton source = (JButton) click.getSource();
+        if (source.getText().equals("Load")) {
+            loadCourses();
+        } else if (source.getText().equals("Start")) {
+            automatedRun();
+        } else if (source.getText().equals("Step") || source.getText().equals("Continue")) {
+            iterateCourses();
+        } else if (source.getText().equals("Print")) {
+            printCourses();
+        } else if (source.getText().equals("Exit")) {
+            System.exit(0);
+        }
+    }
+
+    private void loadCourses() {
+        int slots = Integer.parseInt(this.field[0].getText());
+        this.courses = new CourseArray(Integer.parseInt(this.field[1].getText()) + 1, slots);
+        this.courses.readClashes(CLASH_FILE_PATH);
+        this.draw();
+    }
+
+    private void iterateCourses() {
+        this.courses.iterate(Integer.parseInt(this.field[3].getText()));
+        this.draw();
+    }
+
+    private void printCourses() {
+        System.out.println("Exam\tSlot\tClashes");
+        for (int i = 1; i < this.courses.length(); i++) {
+            System.out.println("" + i + "\t" + this.courses.slot(i) + "\t" + this.courses.status(i));
+        }
+    }
+
+    public void draw() {
+        Graphics g = this.screen.getGraphics();
+        g.clearRect(0, 0, this.screen.getWidth(), this.screen.getHeight());
+        int width = Integer.parseInt(this.field[0].getText()) * 10;
+
+        for (int courseIndex = 1; courseIndex < this.courses.length(); ++courseIndex) {
+            int status = this.courses.status(courseIndex);
+            Color drawColor = (status > 0) ? CRScolor[0] : CRScolor[1];
+            g.setColor(drawColor);
+            g.drawLine(0, courseIndex * 10, width, courseIndex * 10);
+
+            g.setColor(CRScolor[2]);
+            int slotPosition = 10 * this.courses.slot(courseIndex);
+            g.drawLine(slotPosition, courseIndex * 10, slotPosition + 10, courseIndex * 10);
+        }
+    }
+
+    public void automatedRun() {
+        int shifts = Integer.parseInt(this.field[3].getText());
+        int iterations = Integer.parseInt(this.field[2].getText());
+        for (int iteration = 1; iteration <= iterations; iteration++) {
+            this.courses.iterate(shifts);
+            this.draw();
+            int clashes = this.courses.clashesLeft();
+            if (clashes == 0) {
+                autoassociator.train(this.courses.getClashFreeSlots());
+                logger.info("Iteration: " + iteration + ", Shifts: " + shifts + ", Timeslots: " + this.courses.getClashFreeSlots().toString());
+            }
+        }
+    }
+
+    public static void main(String[] args) {
+        new TimeTable();
+    }
+
+    class Autoassociator {
+        Set<Integer> clashFreeSlots = new HashSet<>();
+
+        void train(Set<Integer> slots) {
+            clashFreeSlots.addAll(slots);
+        }
+
+        Set<Integer> recall() {
+            return new HashSet<>(clashFreeSlots);
+        }
+    }
 }
