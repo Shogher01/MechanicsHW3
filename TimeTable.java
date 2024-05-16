@@ -2,8 +2,6 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.logging.Logger;
 import java.util.logging.FileHandler;
 import java.util.logging.SimpleFormatter;
@@ -15,9 +13,11 @@ public class TimeTable extends JFrame implements ActionListener {
     private JTextField[] field;
     private CourseArray courses;
     private Color[] CRScolor;
-    private Autoassociator autoassociator = new Autoassociator();
     private static Logger logger = Logger.getLogger("TimeTableLog");
     private static final String CLASH_FILE_PATH = "lse-f-91.stu";
+    private Autoassociator autoassociator;
+    private int iterations, shifts;
+    private boolean isLoaded = false;
 
     public TimeTable() {
         super("Dynamic Time Table");
@@ -66,34 +66,27 @@ public class TimeTable extends JFrame implements ActionListener {
     public void actionPerformed(ActionEvent click) {
         JButton source = (JButton) click.getSource();
         if (source.getText().equals("Load")) {
-            loadCourses();
-        } else if (source.getText().equals("Start")) {
+            int slots = Integer.parseInt(this.field[0].getText());
+            this.courses = new CourseArray(Integer.parseInt(this.field[1].getText()) + 1, slots);
+            this.courses.readClashes(CLASH_FILE_PATH);
+            this.autoassociator = new Autoassociator(this.courses.length(), slots);
+            this.iterations = Integer.parseInt(this.field[2].getText());
+            this.shifts = Integer.parseInt(this.field[3].getText());
+            this.isLoaded = true;
+            this.draw();
+        } else if (isLoaded && source.getText().equals("Start")) {
+            for (int i = 1; i < this.courses.length(); i++) {
+                this.courses.setSlot(i, 0);
+            }
             automatedRun();
-        } else if (source.getText().equals("Step") || source.getText().equals("Continue")) {
-            iterateCourses();
+        } else if (isLoaded && source.getText().equals("Step")) {
+            stepIteration();
+        } else if (isLoaded && source.getText().equals("Continue")) {
+            automatedRun();
         } else if (source.getText().equals("Print")) {
-            printCourses();
+            printTimetable();
         } else if (source.getText().equals("Exit")) {
             System.exit(0);
-        }
-    }
-
-    private void loadCourses() {
-        int slots = Integer.parseInt(this.field[0].getText());
-        this.courses = new CourseArray(Integer.parseInt(this.field[1].getText()) + 1, slots);
-        this.courses.readClashes(CLASH_FILE_PATH);
-        this.draw();
-    }
-
-    private void iterateCourses() {
-        this.courses.iterate(Integer.parseInt(this.field[3].getText()));
-        this.draw();
-    }
-
-    private void printCourses() {
-        System.out.println("Exam\tSlot\tClashes");
-        for (int i = 1; i < this.courses.length(); i++) {
-            System.out.println("" + i + "\t" + this.courses.slot(i) + "\t" + this.courses.status(i));
         }
     }
 
@@ -114,33 +107,32 @@ public class TimeTable extends JFrame implements ActionListener {
         }
     }
 
-    public void automatedRun() {
-        int shifts = Integer.parseInt(this.field[3].getText());
-        int iterations = Integer.parseInt(this.field[2].getText());
-        for (int iteration = 1; iteration <= iterations; iteration++) {
-            this.courses.iterate(shifts);
+    private void automatedRun() {
+        for (int iteration = 1; iteration <= this.iterations; iteration++) {
+            this.courses.iterate(this.shifts);
+            this.autoassociator.train(this.courses.getSlots());
             this.draw();
             int clashes = this.courses.clashesLeft();
-            if (clashes == 0) {
-                autoassociator.train(this.courses.getClashFreeSlots());
-                logger.info("Iteration: " + iteration + ", Shifts: " + shifts + ", Timeslots: " + this.courses.getClashFreeSlots().toString());
-            }
+            logger.info("Iteration: " + iteration + " Shifts: " + this.shifts + " Clashes: " + clashes);
+        }
+    }
+
+    private void stepIteration() {
+        this.courses.iterate(this.shifts);
+        this.autoassociator.train(this.courses.getSlots());
+        this.draw();
+        int clashes = this.courses.clashesLeft();
+        logger.info("Step Iteration - Shifts: " + this.shifts + " Clashes: " + clashes);
+    }
+
+    private void printTimetable() {
+        System.out.println("Exam\tSlot\tClashes");
+        for (int i = 1; i < this.courses.length(); i++) {
+            System.out.println("" + i + "\t" + this.courses.slot(i) + "\t" + this.courses.status(i));
         }
     }
 
     public static void main(String[] args) {
         new TimeTable();
-    }
-
-    class Autoassociator {
-        Set<Integer> clashFreeSlots = new HashSet<>();
-
-        void train(Set<Integer> slots) {
-            clashFreeSlots.addAll(slots);
-        }
-
-        Set<Integer> recall() {
-            return new HashSet<>(clashFreeSlots);
-        }
     }
 }
